@@ -45,6 +45,7 @@ Shader "Custom/ProceduralGrass"
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
+            // Constant buffer for material properties
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseColor;
                 float _Cutoff;
@@ -57,23 +58,24 @@ Shader "Custom/ProceduralGrass"
 
             struct Attributes
             {
-                float4 positionOS : POSITION;
-                float3 normalOS : NORMAL;
-                float2 uv : TEXCOORD0;
+                float4 positionOS : POSITION; // vertex position in Object Space
+                float3 normalOS : NORMAL; // vertex normal in Object Space
+                float2 uv : TEXCOORD0; // UV coordinates for texture mapping
 
-                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_INPUT_INSTANCE_ID // Macro for GPU instancing
             };
 
             struct Varyings
             {
-                float4 positionCS : SV_POSITION;
-                float2 uv : TEXCOORD0;
-                float3 normalWS : TEXCOORD1;
-                float3 positionWS : TEXCOORD2;
+                float4 positionCS : SV_POSITION; // Clip space position for rasterization
+                float2 uv : TEXCOORD0; // UV coordinates passed to the fragment shader
+                float3 normalWS : TEXCOORD1; // vertex normal in World Space
+                float3 positionWS : TEXCOORD2; // vertex position in World Space
 
-                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_INPUT_INSTANCE_ID // Macro for GPU instancing
             };
 
+            // Hash21() generates a deterministic pseudo-random value between 0 and 1 based on a 2D input
             float Hash21(float2 p)
             {
                 return frac(
@@ -82,22 +84,24 @@ Shader "Custom/ProceduralGrass"
                 );
             }
 
+            // vert() is the vertex shader function where animation happens
             Varyings vert(Attributes input)
             {
-                Varyings output;
+                Varyings output; // Output structure to pass data to the fragment shader
 
                 UNITY_SETUP_INSTANCE_ID(input);
-                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_TRANSFER_INSTANCE_ID(input, output); 
 
                 float3 positionWS =
                     TransformObjectToWorld(input.positionOS.xyz);
 
                 float3 centerWS =
-                    TransformObjectToWorld(float3(0, 0, 0));
+                    TransformObjectToWorld(float3(0, 0, 0)); // Center of the grass object in World Space
 
                 float randomPhase =
                     Hash21(centerWS.xz) * 6.2831853;
 
+                // Wind calculations
                 float wave =
                     sin(
                         _Time.y * _WindSpeed
@@ -107,9 +111,9 @@ Shader "Custom/ProceduralGrass"
                     );
 
                 float heightFactor =
-                    input.uv.y * input.uv.y;
+                    input.uv.y * input.uv.y; // Makes the upper vertices move more than the lower ones
 
-                float2 direction = _WindDirection.xz;
+                float2 direction = _WindDirection.xz; // Extracts the horizontal components of the wind direction
                 direction /= max(length(direction), 0.0001);
 
                 float3 displacement = float3(
@@ -147,16 +151,16 @@ Shader "Custom/ProceduralGrass"
                 float3 normalWS = normalize(input.normalWS);
 
                 float NdotL = saturate(
-                    dot(normalWS, mainLight.direction)
+                    dot(normalWS, mainLight.direction) // Calculates how directly the surface faces the light
                 );
 
-                float lighting = 0.45 + NdotL * 0.55;
+                float lighting = 0.45 + NdotL * 0.55; // Ambient light contribution + directional light contribution
 
                 float colorVariation =
                     lerp(
                         0.85,
                         1.15,
-                        Hash21(floor(input.positionWS.xz))
+                        Hash21(floor(input.positionWS.xz)) // Generates a pseudo-random value based on the vertex position
                     );
 
                 half3 finalColor =

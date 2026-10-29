@@ -3,6 +3,7 @@ using UnityEngine;
 using System.Collections.Generic;
 
 public static class GrassMeshGenerator
+// Creates a procedural grass mesh consisting of three intersecting quads
 {
     public static Mesh Generate(float width = 0.6f, float height = 1f)
     {
@@ -19,7 +20,10 @@ public static class GrassMeshGenerator
                 Mathf.Cos(angle),
                 0f,
                 Mathf.Sin(angle)
-            );
+            ); 
+
+            // because of the 3 quads, we need to rotate them by 60 degrees each time
+            // sin and cos are used for coords because of 1 unit circle (check notes)
 
             Vector3 left = -direction * width * 0.5f;
             Vector3 right = direction * width * 0.5f;
@@ -31,18 +35,22 @@ public static class GrassMeshGenerator
             vertices.Add(left + Vector3.up * height);
             vertices.Add(right + Vector3.up * height);
 
-            uvs.Add(new Vector2(0, 0));
-            uvs.Add(new Vector2(1, 0));
-            uvs.Add(new Vector2(0, 1));
-            uvs.Add(new Vector2(1, 1));
+            uvs.Add(new Vector2(0, 0)); // bottom left
+            uvs.Add(new Vector2(1, 0)); // bottom right
+            uvs.Add(new Vector2(0, 1)); // top left
+            uvs.Add(new Vector2(1, 1)); // top right
+            //created quad with vertices 0, 1, 2, 3
 
             for (int j = 0; j < 4; j++)
                 normals.Add(Vector3.up);
 
+            // triangle one with vertices 0, 2, 1
+            // 0, 2, 1 since we want to make sure the triangles are facing the right way (clockwise)
             triangles.Add(start + 0);
             triangles.Add(start + 2);
             triangles.Add(start + 1);
 
+            // triangle two with vertices 1, 2, 3
             triangles.Add(start + 1);
             triangles.Add(start + 2);
             triangles.Add(start + 3);
