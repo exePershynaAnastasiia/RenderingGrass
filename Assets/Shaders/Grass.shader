@@ -8,10 +8,14 @@ Shader "Custom/ProceduralGrass"
         _BaseColor ("Base Color", Color) = (1, 1, 1, 1) // Color multiplier
         _Cutoff ("Alpha Cutoff", Range(0, 1)) = 0.4 // Which transparent pixels are discarded
 
-        _WindStrength ("Wind Strength", Range(0, 1)) = 0.2 // How far grass moves
-        _WindSpeed ("Wind Speed", Range(0, 10)) = 2 // How quickly grass sways
+        _WindStrength ("Wind Strength", Range(0, 1)) = 0.15 // How far grass moves
+        _WindSpeed ("Wind Speed", Range(0, 10)) = 1.5 // How quickly grass sways
         _WindFrequency ("Wind Frequency", Range(0, 5)) = 1 // How frequently wind waves repeat across field
         _WindDirection ("Wind Direction", Vector) = (1, 0, 0, 0) // Direction in which grass moves
+
+        //player-grass interactions
+        _InteractionRadius ("Interaction Radius", Range(0, 3)) = 4.0
+        _InteractionStrength ("Interaction Strength", Range(0, 2)) = 0.5
     }
 
     SubShader
@@ -37,7 +41,7 @@ Shader "Custom/ProceduralGrass"
             #pragma vertex vert // Specifies vert() as the vertex shader
             #pragma fragment frag // Specifies frag() as the fragment shader
             #pragma multi_compile_instancing // Enables GPU instancing for grass blades
-            #pragma instancing_options assumeuniformscaling // Assumes grass blades are uniformly scaled
+            //#pragma instancing_options assumeuniformscaling // Assumes grass blades are uniformly scaled => not anymore
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl" // Includes core functions and macros for URP
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl" // Includes lighting functions and macros for URP
@@ -54,7 +58,15 @@ Shader "Custom/ProceduralGrass"
                 float _WindSpeed;
                 float _WindFrequency;
                 float4 _WindDirection;
+
+                // Player interaction settings
+                float _InteractionRadius;
+                float _InteractionStrength;
             CBUFFER_END
+
+            // Player position and forward direction in World Space
+            float4 _PlayerPositionWS;
+            float4 _PlayerForwardWS;
 
             struct Attributes
             {
@@ -97,6 +109,7 @@ Shader "Custom/ProceduralGrass"
 
                 float3 centerWS =
                     TransformObjectToWorld(float3(0, 0, 0)); // Center of the grass object in World Space
+                    
 
                 float randomPhase =
                     Hash21(centerWS.xz) * 6.2831853;
@@ -116,13 +129,78 @@ Shader "Custom/ProceduralGrass"
                 float2 direction = _WindDirection.xz; // Extracts the horizontal components of the wind direction
                 direction /= max(length(direction), 0.0001);
 
-                float3 displacement = float3(
-                    direction.x,
-                    0,
-                    direction.y
-                ) * wave * _WindStrength * heightFactor;
+                // Calculate how much the grass bends based on wind strength
+                float bendAmount = abs(wave) * _WindStrength;
 
+                // Apply horizontal displacement and slightly lower the grass tip
+                float3 displacement = float3(
+                    direction.x * wave * _WindStrength * heightFactor,
+                    -bendAmount * bendAmount * heightFactor * 0.5,
+                    direction.y * wave * _WindStrength * heightFactor
+                );
+
+                // Apply wind displacement
                 positionWS += displacement;
+
+                // Calculate direction from player to grass cluster
+                float2 playerToGrass = centerWS.xz - _PlayerPositionWS.xz;
+
+                // Calculate distance to the grass cluster
+                float distanceToPlayer = length(playerToGrass);
+
+                // Normalize the player's forward direction
+                float2 forward = _PlayerForwardWS.xz;
+                forward /= max(length(forward), 0.0001);
+
+                // Calculate the player's right direction
+                float2 right = float2(-forward.y, forward.x);
+
+                // Project grass position onto player's forward and right axes
+                float forwardDistance = dot(playerToGrass, forward);
+                float sideDistance = dot(playerToGrass, right);
+
+                // Calculate interaction influence based on distance
+                float radius = max(_InteractionRadius, 0.0001);
+
+                float distanceInfluence = 1.0 - smoothstep(
+                    0.0,
+                    radius,
+                    distanceToPlayer
+                );
+
+                // Apply stronger interaction to grass in front of the player
+                float frontInfluence = smoothstep(
+                    -0.3,
+                    0.8,
+                    forwardDistance
+                );
+
+                // Calculate final interaction strength
+                float interaction = distanceInfluence * frontInfluence;
+
+                // Bend grass forward in the player's direction
+                float2 forwardBend =
+                    forward * interaction * _InteractionStrength;
+
+                // Push grass sideways to create a path
+                float sideSign = sideDistance >= 0.0 ? 1.0 : -1.0;
+
+                float2 sidewaysBend =
+                    right
+                    * sideSign
+                    * interaction
+                    * _InteractionStrength
+                    * 0.6;
+
+                // Combine forward and sideways bending
+                float2 playerDisplacement =
+                    (forwardBend + sidewaysBend) * heightFactor;
+
+                // Apply horizontal displacement
+                positionWS.xz += playerDisplacement;
+
+                // Slightly lower grass tips when bending
+                positionWS.y -= length(playerDisplacement) * 0.2;
 
                 output.positionWS = positionWS;
                 output.positionCS =

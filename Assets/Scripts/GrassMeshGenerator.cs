@@ -3,67 +3,91 @@ using UnityEngine;
 using System.Collections.Generic;
 
 public static class GrassMeshGenerator
-// Creates a procedural grass mesh consisting of three intersecting quads
 {
-    public static Mesh Generate(float width = 0.6f, float height = 1f)
+    public static Mesh Generate(
+        float width = 0.6f,
+        float height = 1f,
+        int segments = 5)
     {
         List<Vector3> vertices = new List<Vector3>();
         List<Vector2> uvs = new List<Vector2>();
         List<Vector3> normals = new List<Vector3>();
         List<int> triangles = new List<int>();
 
+        // Ensure at least one segment per quad
+        segments = Mathf.Max(1, segments);
+
+        // Generate three intersecting grass planes
         for (int i = 0; i < 3; i++)
         {
+            // Rotate each plane by 60 degrees around the Y axis
             float angle = i * Mathf.PI / 3f;
 
+            // Calculate the horizontal direction using sine and cosine
             Vector3 direction = new Vector3(
                 Mathf.Cos(angle),
                 0f,
                 Mathf.Sin(angle)
-            ); 
+            );
 
-            // because of the 3 quads, we need to rotate them by 60 degrees each time
-            // sin and cos are used for coords because of 1 unit circle (check notes)
-
+            // Calculate the left and right edges of the plane
             Vector3 left = -direction * width * 0.5f;
             Vector3 right = direction * width * 0.5f;
 
+            // Store the starting vertex index for the current plane
             int start = vertices.Count;
 
-            vertices.Add(left);
-            vertices.Add(right);
-            vertices.Add(left + Vector3.up * height);
-            vertices.Add(right + Vector3.up * height);
+            // Generate pairs of vertices along the height of the plane
+            for (int j = 0; j <= segments; j++)
+            {
+                // Normalized height from 0 (bottom) to 1 (top)
+                float t = (float)j / segments;
+                float y = t * height;
 
-            uvs.Add(new Vector2(0, 0)); // bottom left
-            uvs.Add(new Vector2(1, 0)); // bottom right
-            uvs.Add(new Vector2(0, 1)); // top left
-            uvs.Add(new Vector2(1, 1)); // top right
-            //created quad with vertices 0, 1, 2, 3
+                // Add left and right vertices at the current height
+                vertices.Add(left + Vector3.up * y);
+                vertices.Add(right + Vector3.up * y);
 
-            for (int j = 0; j < 4; j++)
+                // Assign UV coordinates for texture mapping and wind animation
+                uvs.Add(new Vector2(0, t));
+                uvs.Add(new Vector2(1, t));
+
+                // Use upward-facing normals for consistent grass lighting
                 normals.Add(Vector3.up);
+                normals.Add(Vector3.up);
+            }
 
-            // triangle one with vertices 0, 2, 1
-            // 0, 2, 1 since we want to make sure the triangles are facing the right way (clockwise)
-            triangles.Add(start + 0);
-            triangles.Add(start + 2);
-            triangles.Add(start + 1);
+            // Connect consecutive vertex rows with two triangles
+            for (int j = 0; j < segments; j++)
+            {
+                int bottomLeft = start + j * 2;
+                int bottomRight = bottomLeft + 1;
+                int topLeft = bottomLeft + 2;
+                int topRight = bottomLeft + 3;
 
-            // triangle two with vertices 1, 2, 3
-            triangles.Add(start + 1);
-            triangles.Add(start + 2);
-            triangles.Add(start + 3);
+                // First triangle
+                triangles.Add(bottomLeft);
+                triangles.Add(topLeft);
+                triangles.Add(bottomRight);
+
+                // Second triangle
+                triangles.Add(bottomRight);
+                triangles.Add(topLeft);
+                triangles.Add(topRight);
+            }
         }
 
+        // Create the final grass mesh
         Mesh mesh = new Mesh();
-        mesh.name = "Procedural Grass Cluster";
+        mesh.name = "Segmented Grass Cluster";
 
+        // Assign generated geometry data
         mesh.SetVertices(vertices);
         mesh.SetUVs(0, uvs);
         mesh.SetNormals(normals);
         mesh.SetTriangles(triangles, 0);
 
+        // Calculate mesh bounds for visibility checks
         mesh.RecalculateBounds();
 
         return mesh;
