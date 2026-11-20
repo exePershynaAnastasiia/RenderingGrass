@@ -16,6 +16,9 @@ Shader "Custom/ProceduralGrass"
         //player-grass interactions
         _InteractionRadius ("Interaction Radius", Range(0, 3)) = 4.0
         _InteractionStrength ("Interaction Strength", Range(0, 2)) = 0.5
+
+        _GrassColorA ("Grass Color A", Color) = (0.25, 0.45, 0.12, 1)
+        _GrassColorB ("Grass Color B", Color) = (0.65, 0.7, 0.25, 1)
     }
 
     SubShader
@@ -62,6 +65,10 @@ Shader "Custom/ProceduralGrass"
                 // Player interaction settings
                 float _InteractionRadius;
                 float _InteractionStrength;
+
+                // Grass color variations
+                float4 _GrassColorA;
+                float4 _GrassColorB;
             CBUFFER_END
 
             // Player position and forward direction in World Space
@@ -172,7 +179,7 @@ Shader "Custom/ProceduralGrass"
                 float frontInfluence = smoothstep(
                     -0.3,
                     0.8,
-                    forwardDistance
+                    forwardDistance + 1.0
                 );
 
                 // Calculate final interaction strength
@@ -201,6 +208,17 @@ Shader "Custom/ProceduralGrass"
 
                 // Slightly lower grass tips when bending
                 positionWS.y -= length(playerDisplacement) * 0.2;
+
+
+                ////////////////////////////////////
+                //    DECORARIVE VARIATIONS
+                ///////////////////////////////////
+
+
+
+
+
+                ///////////////////////////////////
 
                 output.positionWS = positionWS;
                 output.positionCS =
@@ -234,20 +252,21 @@ Shader "Custom/ProceduralGrass"
 
                 float lighting = 0.45 + NdotL * 0.55; // Ambient light contribution + directional light contribution
 
-                float colorVariation =
-                    lerp(
-                        0.85,
-                        1.15,
-                        Hash21(floor(input.positionWS.xz)) // Generates a pseudo-random value based on the vertex position
-                    );
+                // Generate stable variation based on grass cluster position
+                float randomValue = Hash21(floor(input.positionWS.xz));
+
+                // Blend between two grass colors
+                float3 grassTint = lerp(
+                    _GrassColorA.rgb,
+                    _GrassColorB.rgb,
+                    randomValue
+                );
 
                 half3 finalColor =
                     texColor.rgb
-                    * _BaseColor.rgb
+                    * grassTint
                     * mainLight.color
-                    * lighting
-                    * colorVariation;
-
+                    * lighting;
                 return half4(finalColor, 1);
             }
 
