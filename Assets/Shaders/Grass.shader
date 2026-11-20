@@ -14,11 +14,11 @@ Shader "Custom/ProceduralGrass"
         _WindDirection ("Wind Direction", Vector) = (1, 0, 0, 0) // Direction in which grass moves
 
         //player-grass interactions
-        _InteractionRadius ("Interaction Radius", Range(0, 3)) = 4.0
+        _InteractionRadius ("Interaction Radius", Range(0, 4)) = 4.0
         _InteractionStrength ("Interaction Strength", Range(0, 2)) = 0.5
 
-        _GrassColorA ("Grass Color A", Color) = (0.25, 0.45, 0.12, 1)
-        _GrassColorB ("Grass Color B", Color) = (0.65, 0.7, 0.25, 1)
+        _GrassColorA ("Grass Color A", Color) = (0.306, 0.678, 0.329, 1)
+        _GrassColorB ("Grass Color B", Color) = (0.569, 0.839, 0.427, 1)
     }
 
     SubShader
@@ -90,6 +90,8 @@ Shader "Custom/ProceduralGrass"
                 float2 uv : TEXCOORD0; // UV coordinates passed to the fragment shader
                 float3 normalWS : TEXCOORD1; // vertex normal in World Space
                 float3 positionWS : TEXCOORD2; // vertex position in World Space
+                float3 centerWS : TEXCOORD3;
+
 
                 UNITY_VERTEX_INPUT_INSTANCE_ID // Macro for GPU instancing
             };
@@ -229,6 +231,9 @@ Shader "Custom/ProceduralGrass"
 
                 output.uv = input.uv;
 
+                // Pass the grass cluster center for stable color variation
+                output.centerWS = centerWS;
+
                 return output;
             }
 
@@ -250,9 +255,9 @@ Shader "Custom/ProceduralGrass"
                     dot(normalWS, mainLight.direction) // Calculates how directly the surface faces the light
                 );
 
-                float lighting = 0.45 + NdotL * 0.55; // Ambient light contribution + directional light contribution
+                float lighting = 0.6 + NdotL * 0.55; // Ambient light contribution + directional light contribution
 
-                // Generate stable variation based on grass cluster position
+                // Generate random grass color variation
                 float randomValue = Hash21(floor(input.positionWS.xz));
 
                 // Blend between two grass colors
@@ -262,11 +267,15 @@ Shader "Custom/ProceduralGrass"
                     randomValue
                 );
 
+                // Apply grayscale texture and procedural color
                 half3 finalColor =
                     texColor.rgb
                     * grassTint
                     * mainLight.color
                     * lighting;
+
+                return half4(finalColor, 1);
+
                 return half4(finalColor, 1);
             }
 
