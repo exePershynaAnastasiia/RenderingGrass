@@ -211,17 +211,6 @@ Shader "Custom/ProceduralGrass"
                 // Slightly lower grass tips when bending
                 positionWS.y -= length(playerDisplacement) * 0.2;
 
-
-                ////////////////////////////////////
-                //    DECORARIVE VARIATIONS
-                ///////////////////////////////////
-
-
-
-
-
-                ///////////////////////////////////
-
                 output.positionWS = positionWS;
                 output.positionCS =
                     TransformWorldToHClip(positionWS);
